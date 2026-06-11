@@ -1,0 +1,40 @@
+services:
+    attendee-app-local:
+      environment:
+        - LAUNCH_BOT_METHOD=docker-compose-multi-host
+
+    attendee-worker-local:
+      image: attendee-attendee-worker-local:latest
+      environment:
+        - LAUNCH_BOT_METHOD=docker-compose-multi-host
+
+    attendee-scheduler-local:
+      environment:
+        - LAUNCH_BOT_METHOD=docker-compose-multi-host
+
+    postgres:
+      ports:
+        - "5432:5432"
+
+    redis:
+      ports:
+        - "6379:6379"
+
+    attendee-bot-launcher-local:
+      image: attendee-attendee-worker-local:latest
+      build: ./
+      user: root
+      volumes:
+        - .:/attendee
+        - /var/run/docker.sock:/var/run/docker.sock
+      network_mode: host
+      environment:
+        - POSTGRES_HOST=127.0.0.1
+        - REDIS_URL=redis://127.0.0.1:6379/5
+        - DJANGO_SETTINGS_MODULE=attendee.settings.development
+        - LAUNCH_BOT_METHOD=docker-compose-multi-host
+        - BOT_CONTAINER_IMAGE=attendee-attendee-worker-local:latest
+        - BOT_HOST_CODE_PATH=${PWD}
+        - BOT_MAX_SIMULTANEOUS_BOTS=10
+        - BOT_MEMORY_LIMIT=2g
+      command: celery -A attendee worker -l INFO -Q bot_launcher_vm --concurrency=1
