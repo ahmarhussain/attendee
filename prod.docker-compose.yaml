@@ -6,12 +6,12 @@ services:
       - .env.prod
     environment:
       DJANGO_SETTINGS_MODULE: attendee.settings.production
-      DJANGO_SSL_REQUIRE: "true"
+      DJANGO_SSL_REQUIRE: "${PROD_DJANGO_SSL_REQUIRE:-false}"
       POSTGRES_SSL_REQUIRE: "false"
     command:
       - bash
       - -lc
-      - python manage.py collectstatic --noinput && gunicorn attendee.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+      - python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn attendee.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -30,7 +30,7 @@ services:
       - .env.prod
     environment:
       DJANGO_SETTINGS_MODULE: attendee.settings.production
-      DJANGO_SSL_REQUIRE: "true"
+      DJANGO_SSL_REQUIRE: "${PROD_DJANGO_SSL_REQUIRE:-false}"
       POSTGRES_SSL_REQUIRE: "false"
     command: celery -A attendee worker -l INFO
     depends_on:
@@ -49,7 +49,7 @@ services:
       - .env.prod
     environment:
       DJANGO_SETTINGS_MODULE: attendee.settings.production
-      DJANGO_SSL_REQUIRE: "true"
+      DJANGO_SSL_REQUIRE: "${PROD_DJANGO_SSL_REQUIRE:-false}"
       POSTGRES_SSL_REQUIRE: "false"
     command: python manage.py run_scheduler
     depends_on:
