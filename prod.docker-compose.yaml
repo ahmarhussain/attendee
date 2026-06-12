@@ -1,0 +1,101 @@
+services:
+  web:
+    build: ./
+    image: ground-attendee:prod
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: attendee.settings.production
+      DJANGO_SSL_REQUIRE: "true"
+      POSTGRES_SSL_REQUIRE: "false"
+    command:
+      - bash
+      - -lc
+      - python manage.py collectstatic --noinput && gunicorn attendee.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - attendee_prod_network
+    restart: unless-stopped
+
+  worker:
+    build: ./
+    image: ground-attendee:prod
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: attendee.settings.production
+      DJANGO_SSL_REQUIRE: "true"
+      POSTGRES_SSL_REQUIRE: "false"
+    command: celery -A attendee worker -l INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - attendee_prod_network
+    restart: unless-stopped
+
+  scheduler:
+    build: ./
+    image: ground-attendee:prod
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: attendee.settings.production
+      DJANGO_SSL_REQUIRE: "true"
+      POSTGRES_SSL_REQUIRE: "false"
+    command: python manage.py run_scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - attendee_prod_network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15.3-alpine
+    env_file:
+      - .env.prod
+    environment:
+      PGDATA: /data/postgres
+    volumes:
+      - postgres_data:/data/postgres
+    networks:
+      - attendee_prod_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - attendee_prod_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  attendee_prod_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
